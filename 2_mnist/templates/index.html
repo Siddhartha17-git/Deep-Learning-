@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MNIST Digit Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f0ede8;
+    --surface:   #ffffff;
+    --ink:       #1a1714;
+    --ink-dim:   #7a756e;
+    --accent:    #e84545;
+    --accent2:   #2563eb;
+    --accent3:   #16a34a;
+    --border:    #ddd9d3;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Outfit', sans-serif;
+    --radius:    14px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+  }
+
+  /* Noise texture overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.4;
+  }
+
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 20px;
+  }
+
+  .brand h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1;
+  }
+
+  .brand h1 span { color: var(--accent); }
+
+  .brand sub {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--ink-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 5px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    background: var(--ink);
+    color: var(--bg);
+    padding: 5px 12px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Layout ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: 4px 4px 0px var(--border);
+  }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title .dot-accent {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  /* ── Canvas ── */
+  .canvas-outer {
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: crosshair;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  #drawCanvas {
+    display: block;
+    background: #111;
+    width: 100%;
+    aspect-ratio: 1;
+    touch-action: none;
+  }
+
+  .canvas-hint {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--ink-dim);
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Buttons ── */
+  .btn-row { display: flex; gap: 10px; }
+
+  .btn {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 11px 20px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 3px 3px 0 var(--ink);
+    letter-spacing: 0.3px;
+  }
+
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+
+  .btn-predict { background: var(--accent); color: #fff; flex: 1; }
+  .btn-clear   { background: var(--bg); color: var(--ink); }
+
+  .btn:disabled {
+    opacity: 0.4; cursor: not-allowed;
+    box-shadow: none; transform: none;
+  }
+
+  /* ── Prediction display ── */
+  .pred-hero {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 1.5px solid var(--border);
+    min-height: 100px;
+  }
+
+  .pred-num {
+    font-size: 5.5rem;
+    font-weight: 800;
+    font-family: var(--mono);
+    color: var(--accent);
+    line-height: 1;
+    min-width: 80px;
+    text-align: center;
+    transition: all 0.3s;
+  }
+
+  .pred-meta { flex: 1; }
+
+  .pred-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .pred-conf {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent3);
+    line-height: 1.2;
+  }
+
+  .pred-placeholder {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-dim);
+    text-align: center;
+    width: 100%;
+  }
+
+  /* ── Prob bars ── */
+  .prob-title {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+
+  .prob-grid { display: flex; flex-direction: column; gap: 6px; }
+
+  .prob-row {
+    display: grid;
+    grid-template-columns: 16px 1fr 42px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .prob-digit {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-dim);
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .prob-track {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    height: 9px;
+    overflow: hidden;
+  }
+
+  .prob-fill {
+    height: 100%;
+    background: var(--ink);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.45s cubic-bezier(.23,1,.32,1);
+  }
+
+  .prob-fill.winner { background: var(--accent); }
+
+  .prob-pct {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--ink-dim);
+    text-align: right;
+  }
+
+  /* ── Model info panel ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .info-tile {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+
+  .info-val {
+    font-family: var(--mono);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent2);
+    line-height: 1;
+  }
+
+  .info-key {
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  /* ── Architecture table ── */
+  .arch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+  }
+
+  .arch-table th {
+    text-align: left;
+    padding: 6px 10px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 0.62rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .arch-table th:first-child { border-radius: 6px 0 0 0; }
+  .arch-table th:last-child  { border-radius: 0 6px 0 0; }
+
+  .arch-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink-dim);
+  }
+
+  .arch-table td:first-child { color: var(--ink); font-weight: 600; }
+
+  .arch-table tr:last-child td { border-bottom: none; }
+
+  .badge-act {
+    background: var(--accent2);
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .badge-act.softmax { background: var(--accent); }
+  .badge-act.dropout { background: var(--ink-dim); }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
+
+  /* ── Status bar ── */
+  #statusBar {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--ink-dim);
+    margin-top: 10px;
+    min-height: 18px;
+    text-align: center;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 500px) {
+    .brand h1 { font-size: 1.5rem; }
+    .pred-num { font-size: 4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>Digit<span>Sense</span></h1>
+      <sub>MLP · MNIST · Multi-class Classification</sub>
+    </div>
+    <div class="tag">Flask + Keras Backend</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEFT: Draw -->
+    <div>
+      <div class="card">
+        <div class="card-title"><span class="dot-accent"></span>Draw a Digit</div>
+        <div class="canvas-outer">
+          <canvas id="drawCanvas" width="280" height="280"></canvas>
+        </div>
+        <p class="canvas-hint">Use mouse or finger · thick strokes work best</p>
+        <div class="btn-row">
+          <button class="btn btn-predict" id="predictBtn">Predict</button>
+          <button class="btn btn-clear"   id="clearBtn">Clear</button>
+        </div>
+        <div id="statusBar"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Results + Info -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- Prediction -->
+      <div class="card">
+        <div class="card-title"><span class="dot-accent"></span>Prediction</div>
+
+        <div class="pred-hero" id="predHero">
+          <div class="pred-placeholder">Draw a digit and click Predict</div>
+        </div>
+
+        <div class="prob-title">Class Probabilities</div>
+        <div class="prob-grid" id="probGrid"></div>
+      </div>
+
+      <!-- Model Info -->
+      <div class="card">
+        <div class="card-title"><span class="dot-accent"></span>Model Architecture</div>
+
+        <div class="info-grid" id="infoTiles">
+          <div class="info-tile"><div class="info-val" id="iParams">—</div><div class="info-key">Total Params</div></div>
+          <div class="info-tile"><div class="info-val">10</div><div class="info-key">Output Classes</div></div>
+          <div class="info-tile"><div class="info-val">784</div><div class="info-key">Input Neurons</div></div>
+          <div class="info-tile"><div class="info-val" id="iLayers">—</div><div class="info-key">Total Layers</div></div>
+        </div>
+
+        <table class="arch-table" id="archTable">
+          <thead>
+            <tr><th>Layer</th><th>Units</th><th>Activation</th></tr>
+          </thead>
+          <tbody id="archBody">
+            <tr><td colspan="3" style="text-align:center;padding:16px;">
+              <span class="spinner"></span> Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Canvas setup ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d');
+let drawing = false, lastX = 0, lastY = 0;
+
+ctx.fillStyle = '#111';
+ctx.fillRect(0, 0, 280, 280);
+ctx.strokeStyle = '#fff';
+ctx.lineWidth = 18;
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width / r.width;
+  const sy = canvas.height / r.height;
+  if (e.touches) return [(e.touches[0].clientX - r.left)*sx, (e.touches[0].clientY - r.top)*sy];
+  return [(e.clientX - r.left)*sx, (e.clientY - r.top)*sy];
+}
+
+canvas.addEventListener('mousedown',  e => { drawing=true;  [lastX,lastY]=pos(e); });
+canvas.addEventListener('mousemove',  e => { if(!drawing) return; const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke(); [lastX,lastY]=[x,y]; });
+canvas.addEventListener('mouseup',    () => drawing=false);
+canvas.addEventListener('mouseleave', () => drawing=false);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; [lastX,lastY]=pos(e); }, {passive:false});
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); if(!drawing)return; const[x,y]=pos(e); ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke(); [lastX,lastY]=[x,y]; }, {passive:false});
+canvas.addEventListener('touchend',   () => drawing=false);
+
+document.getElementById('clearBtn').onclick = () => {
+  ctx.fillStyle='#111'; ctx.fillRect(0,0,280,280);
+  resetUI();
+};
+
+// ─── Init prob bars ───────────────────────────────────────────────────────────
+function initBars() {
+  const g = document.getElementById('probGrid');
+  g.innerHTML = '';
+  for (let i = 0; i < 10; i++) {
+    g.innerHTML += `
+      <div class="prob-row">
+        <span class="prob-digit">${i}</span>
+        <div class="prob-track"><div class="prob-fill" id="bar${i}"></div></div>
+        <span class="prob-pct" id="pct${i}">0%</span>
+      </div>`;
+  }
+}
+initBars();
+
+function resetUI() {
+  document.getElementById('predHero').innerHTML = '<div class="pred-placeholder">Draw a digit and click Predict</div>';
+  for (let i=0;i<10;i++){
+    document.getElementById('bar'+i).style.width='0%';
+    document.getElementById('bar'+i).className='prob-fill';
+    document.getElementById('pct'+i).textContent='0%';
+  }
+  setStatus('');
+}
+
+function setStatus(msg) { document.getElementById('statusBar').innerHTML = msg; }
+
+// ─── Predict ──────────────────────────────────────────────────────────────────
+document.getElementById('predictBtn').onclick = async () => {
+  setStatus('<span class="spinner"></span>Sending to model…');
+  const imageData = canvas.toDataURL('image/png');
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData })
+    });
+    const data = await res.json();
+    if (data.error) { setStatus('Error: ' + data.error); return; }
+
+    // Hero
+    document.getElementById('predHero').innerHTML = `
+      <div class="pred-num">${data.predicted}</div>
+      <div class="pred-meta">
+        <div class="pred-label">Predicted Digit</div>
+        <div class="pred-conf">${data.confidence.toFixed(1)}%</div>
+        <div class="pred-label" style="margin-top:2px;">Confidence</div>
+      </div>`;
+
+    // Bars
+    data.probabilities.forEach((p, i) => {
+      const bar = document.getElementById('bar'+i);
+      bar.style.width = p + '%';
+      bar.className = 'prob-fill' + (i === data.predicted ? ' winner' : '');
+      document.getElementById('pct'+i).textContent = p.toFixed(1)+'%';
+    });
+
+    setStatus('');
+  } catch(e) {
+    setStatus('⚠ Could not reach backend. Is Flask running?');
+  }
+};
+
+// ─── Load model info ──────────────────────────────────────────────────────────
+async function loadModelInfo() {
+  try {
+    const res = await fetch('/model-info');
+    const data = await res.json();
+
+    document.getElementById('iParams').textContent = data.total_params.toLocaleString();
+    document.getElementById('iLayers').textContent = data.layers.length;
+
+    const tbody = document.getElementById('archBody');
+    tbody.innerHTML = '';
+    data.layers.forEach(l => {
+      const act = l.activation || (l.type === 'Dropout' ? 'dropout' : '—');
+      const badgeCls = act === 'softmax' ? 'softmax' : act === 'dropout' ? 'dropout' : '';
+      tbody.innerHTML += `
+        <tr>
+          <td>${l.name}</td>
+          <td>${l.units ?? (l.rate ? `rate=${l.rate}` : '—')}</td>
+          <td><span class="badge-act ${badgeCls}">${act}</span></td>
+        </tr>`;
+    });
+  } catch(e) {
+    document.getElementById('archBody').innerHTML =
+      '<tr><td colspan="3" style="color:#e84545;font-family:var(--mono);font-size:0.7rem;padding:12px;">Backend not reachable</td></tr>';
+  }
+}
+
+loadModelInfo();
+</script>
+</body>
+</html>
