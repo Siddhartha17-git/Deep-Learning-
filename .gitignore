@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.dll
+*.h5
+*.keras
+*.pkl
+*.joblib
+venv/
+.venv/
+env/
+.idea/
+.vscode/
+.DS_Store
+*.log
