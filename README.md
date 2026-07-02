@@ -20,10 +20,6 @@ This repository contains several machine learning and deep learning web applicat
    - Folder: [Diabetic_gradio](Diabetic_gradio)
    - Provides a simple Gradio-based UI for prediction.
 
-5. House Price Prediction App (Flask)
-   - Folder: [Houseprice_new/backend](Houseprice_new/backend)
-   - Predicts house prices from real estate features.
-
 ## Requirements
 
 Install Python packages before running any app.
@@ -57,11 +53,5 @@ python app.py
 ```bash
 cd Diabetic_gradio
 python gradio_app.py
-```
-
-### 5. House Price Prediction (New Version)
-```bash
-cd Houseprice_new/backend
-python app.py
 ```
 
