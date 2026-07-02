@@ -1,0 +1,34 @@
+<!-- templates/index.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diabetes Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <h1>Diabetes Prediction System</h1>
+
+    <form action="/predict" method="post">
+
+        <input type="number" step="any" name="pregnancies" placeholder="Pregnancies" required>
+        <input type="number" step="any" name="glucose" placeholder="Glucose Level" required>
+        <input type="number" step="any" name="bp" placeholder="Blood Pressure" required>
+        <input type="number" step="any" name="skin" placeholder="Skin Thickness" required>
+        <input type="number" step="any" name="insulin" placeholder="Insulin" required>
+        <input type="number" step="any" name="bmi" placeholder="BMI" required>
+        <input type="number" step="any" name="dpf" placeholder="Diabetes Pedigree Function" required>
+        <input type="number" step="any" name="age" placeholder="Age" required>
+
+        <button type="submit">Predict</button>
+    </form>
+
+    {% if prediction_text %}
+        <h2 class="result">Result: {{ prediction_text }}</h2>
+    {% endif %}
+</div>
+
+</body>
+</html>
