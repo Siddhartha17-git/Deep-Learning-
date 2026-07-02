@@ -65,21 +65,3 @@ cd Houseprice_new/backend
 python app.py
 ```
 
-## GitHub Upload Steps
-
-1. Create a new repository on GitHub.
-2. Open a terminal in this project folder.
-3. Run the commands below:
-
-```bash
-git init -b main
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/your-username/your-repo-name.git
-git push -u origin main
-```
-
-## Notes
-
-- Some model files are large binary files, so GitHub may handle them better with Git LFS if needed.
-- If you want, you can also add screenshots, screenshots of the UI, and a demo video later.
